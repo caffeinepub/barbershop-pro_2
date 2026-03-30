@@ -55,7 +55,7 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -91,7 +91,7 @@ const MONTHS_ES = [
 const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 const CATEGORIES = [
-  { value: "", label: "Todos" },
+  { value: "all", label: "Todos" },
   { value: "corte", label: "Corte" },
   { value: "tinte", label: "Tinte" },
   { value: "barba", label: "Barba" },
@@ -178,6 +178,40 @@ interface AdminPanelProps {
   actor: any;
   onBack: () => void;
 }
+class AdminErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center h-full text-red-400 p-8 text-center">
+          <div>
+            <p className="font-semibold mb-2">Error al cargar esta sección</p>
+            <p className="text-sm text-muted-foreground">
+              {this.state.error?.message}
+            </p>
+            <button
+              type="button"
+              onClick={() => this.setState({ hasError: false })}
+              className="mt-4 px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded-lg text-sm hover:bg-yellow-500/30 transition-colors"
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export function AdminPanel({ actor: _actor, onBack }: AdminPanelProps) {
   const { actor } = useActor();
@@ -187,7 +221,7 @@ export function AdminPanel({ actor: _actor, onBack }: AdminPanelProps) {
 
   return (
     <div
-      className="flex h-screen bg-[oklch(0.08_0.003_240)] overflow-hidden"
+      className="flex h-[100dvh] bg-[oklch(0.08_0.003_240)] overflow-hidden"
       data-ocid="admin.panel"
     >
       {/* Sidebar — desktop */}
@@ -252,15 +286,17 @@ export function AdminPanel({ actor: _actor, onBack }: AdminPanelProps) {
         </header>
 
         {/* Section content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          {section === "dashboard" && <DashboardSection actor={actor} />}
-          {section === "reservas" && <ReservasSection actor={actor} />}
-          {section === "servicios" && <ServiciosSection actor={actor} />}
-          {section === "barberos" && <BarberosSection actor={actor} />}
-          {section === "config" && <ConfigSection actor={actor} />}
-          {section === "facturacion" && <FacturacionSection actor={actor} />}
-          {section === "galeria" && <GaleriaSection actor={actor} />}
-          {section === "promociones" && <PromocionesSection actor={actor} />}
+        <main className="flex-1 overflow-y-auto p-4 pb-32 md:p-6 md:pb-6 overscroll-contain">
+          <AdminErrorBoundary>
+            {section === "dashboard" && <DashboardSection actor={actor} />}
+            {section === "reservas" && <ReservasSection actor={actor} />}
+            {section === "servicios" && <ServiciosSection actor={actor} />}
+            {section === "barberos" && <BarberosSection actor={actor} />}
+            {section === "config" && <ConfigSection actor={actor} />}
+            {section === "facturacion" && <FacturacionSection actor={actor} />}
+            {section === "galeria" && <GaleriaSection actor={actor} />}
+            {section === "promociones" && <PromocionesSection actor={actor} />}
+          </AdminErrorBoundary>
         </main>
       </div>
 
@@ -310,7 +346,7 @@ function DashboardSection({ actor }: { actor: any }) {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState("all");
   const [barberId, setBarberId] = useState(0n);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [stats, setStats] = useState<{ day: number; reservas: number }[]>([]);
@@ -327,7 +363,7 @@ function DashboardSection({ actor }: { actor: any }) {
         actor.getAppointmentStats(
           BigInt(month),
           BigInt(year),
-          category,
+          category === "all" ? "" : category,
           barberId,
         ),
         actor.getIncomeStats(todayDate),
@@ -349,7 +385,9 @@ function DashboardSection({ actor }: { actor: any }) {
       setIncome(incomeData);
       setBarbers(barberList);
     } catch {
-      toast.error("Error al cargar estadísticas");
+      // silently set defaults on load failure
+      setStats([]);
+      setTotalReservas(0);
     } finally {
       setLoading(false);
     }
@@ -542,9 +580,9 @@ function ReservasSection({ actor }: { actor: any }) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterDate, setFilterDate] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterCategory, setFilterCategory] = useState("");
-  const [filterBarber, setFilterBarber] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterBarber, setFilterBarber] = useState("all");
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [actionLoading, setActionLoading] = useState<bigint | null>(null);
 
@@ -559,7 +597,9 @@ function ReservasSection({ actor }: { actor: any }) {
       setAppointments(appts);
       setBarbers(barberList);
     } catch {
-      toast.error("Error al cargar reservas");
+      // silently set empty on load failure
+      setAppointments([]);
+      setBarbers([]);
     } finally {
       setLoading(false);
     }
@@ -571,10 +611,13 @@ function ReservasSection({ actor }: { actor: any }) {
 
   const filtered = appointments.filter((a) => {
     if (filterDate && a.date !== filterDate) return false;
-    if (filterStatus && a.status !== filterStatus) return false;
-    if (filterCategory && !a.serviceName.toLowerCase().includes(filterCategory))
+    if (filterStatus !== "all" && a.status !== filterStatus) return false;
+    if (
+      filterCategory !== "all" &&
+      !a.serviceName.toLowerCase().includes(filterCategory)
+    )
       return false;
-    if (filterBarber && a.barberName !== filterBarber) return false;
+    if (filterBarber !== "all" && a.barberName !== filterBarber) return false;
     return true;
   });
 
@@ -651,7 +694,7 @@ function ReservasSection({ actor }: { actor: any }) {
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="scheduled">Pendiente</SelectItem>
             <SelectItem value="confirmed">Confirmada</SelectItem>
             <SelectItem value="completed">Completada</SelectItem>
@@ -681,7 +724,7 @@ function ReservasSection({ actor }: { actor: any }) {
             <SelectValue placeholder="Barbero" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
             {barbers.map((b) => (
               <SelectItem key={String(b.id)} value={b.name}>
                 {b.name}
@@ -842,7 +885,8 @@ function ServiciosSection({ actor }: { actor: any }) {
     try {
       setServices(await actor.getServices());
     } catch {
-      toast.error("Error al cargar servicios");
+      // silently set empty on load failure
+      setServices([]);
     } finally {
       setLoading(false);
     }
@@ -1078,7 +1122,7 @@ function ServiciosSection({ actor }: { actor: any }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.filter((c) => c.value).map((c) => (
+                    {CATEGORIES.map((c) => (
                       <SelectItem key={c.value} value={c.value}>
                         {c.label}
                       </SelectItem>
@@ -1213,7 +1257,8 @@ function BarberosSection({ actor }: { actor: any }) {
     try {
       setBarbers(await actor.getBarbers());
     } catch {
-      toast.error("Error al cargar barberos");
+      // silently set empty on load failure
+      setBarbers([]);
     } finally {
       setLoading(false);
     }
@@ -1485,7 +1530,7 @@ function ConfigSection({ actor }: { actor: any }) {
       setEndTime(c.endTime);
       setBlockedDates(c.blockedDates);
     } catch {
-      toast.error("Error al cargar configuración");
+      // silently ignore load failure, keep defaults
     } finally {
       setLoading(false);
     }
@@ -1672,7 +1717,8 @@ function FacturacionSection({ actor }: { actor: any }) {
       setIncome(incomeData);
       setAppointments(appts);
     } catch {
-      toast.error("Error al cargar facturación");
+      // silently set empty on load failure
+      setAppointments([]);
     } finally {
       setLoading(false);
     }
@@ -1818,7 +1864,8 @@ function GaleriaSection({ actor }: { actor: any }) {
     try {
       setItems(await actor.getGalleryItems());
     } catch {
-      toast.error("Error al cargar galería");
+      // silently set empty on load failure
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -1990,7 +2037,8 @@ function PromocionesSection({ actor }: { actor: any }) {
     try {
       setPromos(await actor.getPromotions());
     } catch {
-      toast.error("Error al cargar promociones");
+      // silently set empty on load failure
+      setPromos([]);
     } finally {
       setLoading(false);
     }

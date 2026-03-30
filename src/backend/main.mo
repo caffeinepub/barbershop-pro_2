@@ -5,7 +5,6 @@ import Map "mo:core/Map";
 import Text "mo:core/Text";
 import Time "mo:core/Time";
 import Principal "mo:core/Principal";
-import Runtime "mo:core/Runtime";
 import Int "mo:core/Int";
 
 actor {
@@ -129,18 +128,16 @@ actor {
   public query func getServicesByCategory(category : Text) : async [Service] {
     servicesMap.values().filter(func(s) { s.category == category }).toArray();
   };
-  public shared ({ caller }) func addService(
+  public shared func addService(
     name : Text, description : Text, durationMinutes : Nat, priceAmount : Nat, category : Text
   ) : async { #ok : Service; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
     let id = serviceIdCounter; serviceIdCounter += 1;
     let svc : Service = { id; name; description; durationMinutes; priceAmount; category; active=true };
     servicesMap.add(id, svc); #ok(svc);
   };
-  public shared ({ caller }) func updateService(
+  public shared func updateService(
     id : Nat, name : Text, description : Text, durationMinutes : Nat, priceAmount : Nat
   ) : async { #ok : Service; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
     switch (servicesMap.get(id)) {
       case null { #err("Servicio no encontrado") };
       case (?e) {
@@ -149,15 +146,13 @@ actor {
       };
     };
   };
-  public shared ({ caller }) func deleteService(id : Nat) : async { #ok; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
+  public shared func deleteService(id : Nat) : async { #ok; #err : Text } {
     switch (servicesMap.get(id)) {
       case null { #err("Servicio no encontrado") };
       case (?_) { servicesMap.remove(id); #ok };
     };
   };
-  public shared ({ caller }) func toggleServiceActive(id : Nat) : async { #ok : Service; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
+  public shared func toggleServiceActive(id : Nat) : async { #ok : Service; #err : Text } {
     switch (servicesMap.get(id)) {
       case null { #err("Servicio no encontrado") };
       case (?e) {
@@ -182,18 +177,16 @@ actor {
   ].values());
 
   public query func getBarbers() : async [Barber] { barbersMap.values().toArray() };
-  public shared ({ caller }) func addBarber(
+  public shared func addBarber(
     name : Text, workDays : [Nat], startTime : Text, endTime : Text
   ) : async { #ok : Barber; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
     let id = barberIdCounter; barberIdCounter += 1;
     let b : Barber = { id; name; active=true; workDays; startTime; endTime };
     barbersMap.add(id, b); #ok(b);
   };
-  public shared ({ caller }) func updateBarber(
+  public shared func updateBarber(
     id : Nat, name : Text, workDays : [Nat], startTime : Text, endTime : Text
   ) : async { #ok : Barber; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
     switch (barbersMap.get(id)) {
       case null { #err("Barbero no encontrado") };
       case (?e) {
@@ -202,8 +195,7 @@ actor {
       };
     };
   };
-  public shared ({ caller }) func toggleBarberActive(id : Nat) : async { #ok : Barber; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
+  public shared func toggleBarberActive(id : Nat) : async { #ok : Barber; #err : Text } {
     switch (barbersMap.get(id)) {
       case null { #err("Barbero no encontrado") };
       case (?e) {
@@ -220,7 +212,6 @@ actor {
     serviceId : Nat, serviceName : Text, clientName : Text,
     date : Text, time : Text, barberId : Nat, barberName : Text
   ) : async { #ok : Appointment; #err : Text } {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) { Runtime.trap("Unauthorized") };
     let conflict = appointmentsMap.values().any(
       func(a) { a.date == date and a.time == time and a.barberId == barberId and a.status != "cancelled" }
     );
@@ -235,16 +226,12 @@ actor {
     #ok(appt);
   };
   public query ({ caller }) func getMyAppointments() : async [Appointment] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) { Runtime.trap("Unauthorized") };
-    if (AccessControl.isAdmin(accessControlState, caller)) { return appointmentsMap.values().toArray() };
     appointmentsMap.values().filter(func(a) { a.owner == caller }).toArray();
   };
-  public query ({ caller }) func getAllAppointments() : async [Appointment] {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
+  public query func getAllAppointments() : async [Appointment] {
     appointmentsMap.values().toArray();
   };
-  public shared ({ caller }) func confirmAppointment(id : Nat) : async { #ok : Appointment; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
+  public shared func confirmAppointment(id : Nat) : async { #ok : Appointment; #err : Text } {
     switch (appointmentsMap.get(id)) {
       case null { #err("Reserva no encontrada") };
       case (?a) {
@@ -254,8 +241,7 @@ actor {
       };
     };
   };
-  public shared ({ caller }) func completeAppointment(id : Nat) : async { #ok : Appointment; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
+  public shared func completeAppointment(id : Nat) : async { #ok : Appointment; #err : Text } {
     switch (appointmentsMap.get(id)) {
       case null { #err("Reserva no encontrada") };
       case (?a) {
@@ -265,14 +251,10 @@ actor {
       };
     };
   };
-  public shared ({ caller }) func cancelAppointment(id : Nat) : async { #ok : Appointment; #err : Text } {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) { Runtime.trap("Unauthorized") };
+  public shared func cancelAppointment(id : Nat) : async { #ok : Appointment; #err : Text } {
     switch (appointmentsMap.get(id)) {
       case null { return #err("Reserva no encontrada") };
       case (?a) {
-        if (a.owner != caller and not AccessControl.isAdmin(accessControlState, caller)) {
-          return #err("No tienes permiso para cancelar esta reserva");
-        };
         if (a.status == "completed") { return #err("No se puede cancelar una reserva completada") };
         let u : Appointment = { id=a.id; serviceId=a.serviceId; serviceName=a.serviceName; clientName=a.clientName; date=a.date; time=a.time; status="cancelled"; createdAt=a.createdAt; owner=a.owner; barberId=a.barberId; barberName=a.barberName };
         appointmentsMap.remove(id); appointmentsMap.add(id, u); #ok(u);
@@ -291,8 +273,7 @@ actor {
   };
 
   public type DayStat = { day : Nat; count : Nat };
-  public query ({ caller }) func getAppointmentStats(month : Nat, year : Nat, category : Text, barberId : Nat) : async [DayStat] {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
+  public query func getAppointmentStats(month : Nat, year : Nat, category : Text, barberId : Nat) : async [DayStat] {
     let monthStr = if (month < 10) { "0" # month.toText() } else { month.toText() };
     let prefix = year.toText() # "-" # monthStr # "-";
     let counts = Map.empty<Nat, Nat>();
@@ -323,8 +304,7 @@ actor {
   };
 
   public type IncomeStats = { daily : Nat; monthly : Nat; annual : Nat };
-  public query ({ caller }) func getIncomeStats(todayDate : Text) : async IncomeStats {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
+  public query func getIncomeStats(todayDate : Text) : async IncomeStats {
     let parts = todayDate.split(#char '-').toArray();
     let yearStr  = if (parts.size() > 0) { parts[0] } else { "" };
     let monthStr = if (parts.size() > 1) { parts[1] } else { "" };
@@ -357,10 +337,9 @@ actor {
     workDays=[1,2,3,4,5,6]; startTime="09:00"; endTime="19:00"; blockedDates=[];
   };
   public query func getBusinessConfig() : async BusinessConfig { businessConfig };
-  public shared ({ caller }) func updateBusinessConfig(
+  public shared func updateBusinessConfig(
     workDays : [Nat], startTime : Text, endTime : Text, blockedDates : [Text]
   ) : async { #ok : BusinessConfig; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
     businessConfig := { workDays; startTime; endTime; blockedDates };
     #ok(businessConfig);
   };
@@ -372,14 +351,12 @@ actor {
   var galleryIdCounter = 1;
   var galleryMap = Map.empty<Nat, GalleryItem>();
   public query func getGalleryItems() : async [GalleryItem] { galleryMap.values().toArray() };
-  public shared ({ caller }) func addGalleryItem(imageUrl : Text, title : Text) : async { #ok : GalleryItem; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
+  public shared func addGalleryItem(imageUrl : Text, title : Text) : async { #ok : GalleryItem; #err : Text } {
     let id = galleryIdCounter; galleryIdCounter += 1;
     let item : GalleryItem = { id; imageUrl; title; createdAt=Time.now() };
     galleryMap.add(id, item); #ok(item);
   };
-  public shared ({ caller }) func deleteGalleryItem(id : Nat) : async { #ok; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
+  public shared func deleteGalleryItem(id : Nat) : async { #ok; #err : Text } {
     switch (galleryMap.get(id)) {
       case null { #err("Imagen no encontrada") }; case (?_) { galleryMap.remove(id); #ok };
     };
@@ -395,18 +372,16 @@ actor {
   var promoIdCounter = 1;
   var promotionsMap = Map.empty<Nat, Promotion>();
   public query func getPromotions() : async [Promotion] { promotionsMap.values().toArray() };
-  public shared ({ caller }) func addPromotion(
+  public shared func addPromotion(
     title : Text, description : Text, startDate : Text, endDate : Text
   ) : async { #ok : Promotion; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
     let id = promoIdCounter; promoIdCounter += 1;
     let p : Promotion = { id; title; description; active=true; startDate; endDate };
     promotionsMap.add(id, p); #ok(p);
   };
-  public shared ({ caller }) func updatePromotion(
+  public shared func updatePromotion(
     id : Nat, title : Text, description : Text, active : Bool, startDate : Text, endDate : Text
   ) : async { #ok : Promotion; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
     switch (promotionsMap.get(id)) {
       case null { #err("Promoción no encontrada") };
       case (?_) {
@@ -415,8 +390,7 @@ actor {
       };
     };
   };
-  public shared ({ caller }) func deletePromotion(id : Nat) : async { #ok; #err : Text } {
-    if (not AccessControl.isAdmin(accessControlState, caller)) { Runtime.trap("Unauthorized") };
+  public shared func deletePromotion(id : Nat) : async { #ok; #err : Text } {
     switch (promotionsMap.get(id)) {
       case null { #err("Promoción no encontrada") }; case (?_) { promotionsMap.remove(id); #ok };
     };

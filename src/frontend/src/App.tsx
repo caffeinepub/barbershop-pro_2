@@ -657,12 +657,10 @@ export default function App() {
 
   if (view === "admin") {
     return (
-      <div className="min-h-screen bg-background">
+      <>
         <Toaster richColors position="top-right" />
-        <AnimatePresence mode="wait">
-          <AdminPanel actor={actor as any} onBack={() => setView("main")} />
-        </AnimatePresence>
-      </div>
+        <AdminPanel actor={actor as any} onBack={() => setView("main")} />
+      </>
     );
   }
 
